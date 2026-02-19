@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASBOT Web Print</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="app.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="robot-icon">🖨️</div>
+            <h1>Web Print</h1>
+            <p class="subtitle">Print documents and text remotely</p>
+            <a href="index.html" class="tiny muted" style="margin-top:10px; display:inline-block">← Back to
+                Dashboard</a>
+        </header>
+
+        <div class="card">
+            <h2>Printer Status</h2>
+            <div id="printer-status">
+                <div class="spinner"></div>
+                Initializing...
+            </div>
+            <button onclick="refreshStatus()" class="secondary" style="width:auto; margin-top:10px">Refresh
+                Status</button>
+        </div>
+
+        <div class="card">
+            <h2>Print File</h2>
+            <form id="print-file-form">
+                <label>Select PDF file(s)</label>
+                <input type="file" id="file-input" multiple accept=".pdf" required>
+
+                <label>Copies</label>
+                <input type="number" id="file-copies" min="1" max="50" value="1" style="width:100px">
+
+                <button type="submit">Print File(s)</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Print Text</h2>
+            <form id="print-text-form">
+                <label>Text content</label>
+                <textarea id="text-input" rows="6" placeholder="Type something to print..." required></textarea>
+
+                <label>Copies</label>
+                <input type="number" id="text-copies" min="1" max="50" value="1" style="width:100px">
+
+                <button type="submit">Print Text</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Test Printer</h2>
+            <p class="muted">Send a test page to verify connectivity.</p>
+            <button onclick="printTestPage()">Print Test Page</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- LOGIC ---
+
+        async function refreshStatus() {
+            const el = document.getElementById("printer-status");
+            el.innerHTML = '<div class="spinner"></div>';
+            try {
+                const data = await apiCall("/status");
+                if (data.success) {
+                    let jobsHtml = "";
+                    if (data.jobs && data.jobs.length > 0) {
+                        jobsHtml = '<ul style="margin-top:10px">';
+                        data.jobs.forEach(job => {
+                            jobsHtml += `<li>${job.details}</li>`;
+                        });
+                        jobsHtml += '</ul>';
+                    } else {
+                        jobsHtml = '<p class="tiny muted">No active jobs.</p>';
+                    }
+
+                    el.innerHTML = `
+                        <div class="ok"><b>${data.status}</b></div>
+                        <div style="margin-top:10px">
+                            <label>Queue:</label>
+                            ${jobsHtml}
+                        </div>
+                    `;
+                } else {
+                    el.innerHTML = `<div class="err">Error: ${data.error}</div>`;
+                }
+            } catch (e) {
+                el.innerHTML = `<div class="err">Connection Error: ${e.message}</div>`;
+            }
+        }
+
+        document.getElementById("print-file-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const files = document.getElementById("file-input").files;
+            if (files.length === 0) return;
+
+            const btn = e.target.querySelector("button");
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "Uploading...";
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append("file", files[i]);
+            }
+            formData.append("copies", document.getElementById("file-copies").value);
+
+            try {
+                const res = await apiCall("/print/file", "POST", formData); // formData auto-sets content-type
+                // apiCall handles parsing json response even if interface says otherwise for simplicity in app.js
+                // actually apiCall logic for FormData is slightly tricky in app.js if checking headers. 
+                // Let's rely on fetch handling FormData correctly (it does).
+                // But app.js logic `if (body && !(body instanceof FormData))` handles the header part.
+
+                // Response is likely the json from backend
+                if (res.success) {
+                    showMessage(`Printed ${res.results.length} file(s) successfully!`, "success");
+                    document.getElementById("print-file-form").reset();
+                    refreshStatus();
+                } else {
+                    showMessage(`Error: ${res.error}`, "error");
+                }
+            } catch (e) {
+                showMessage(`Upload Failed: ${e.message}`, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
+
+        document.getElementById("print-text-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const text = document.getElementById("text-input").value;
+            const copies = document.getElementById("text-copies").value;
+
+            const btn = e.target.querySelector("button");
+            btn.disabled = true;
+
+            try {
+                const res = await apiCall("/print/text", "POST", { text, copies });
+                if (res.success) {
+                    showMessage("Text sent to printer!", "success");
+                    document.getElementById("text-input").value = "";
+                    refreshStatus();
+                } else {
+                    showMessage(`Error: ${res.error}`, "error");
+                }
+            } catch (e) {
+                showMessage(`Print Failed: ${e.message}`, "error");
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        async function printTestPage() {
+            if (!confirm("Print a test page?")) return;
+            try {
+                const res = await apiCall("/print/test", "POST", {});
+                if (res.success) {
+                    showMessage("Test page sent!", "success");
+                    refreshStatus();
+                } else {
+                    showMessage(`Error: ${res.error}`, "error");
+                }
+            } catch (e) {
+                showMessage(`Error: ${e.message}`, "error");
+            }
+        }
+
+        // Init
+        document.addEventListener("DOMContentLoaded", refreshStatus);
+    </script>
+</body>
+
+</html>

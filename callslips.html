@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASBOT Call Slips</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="app.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="robot-icon">📄</div>
+            <h1>Call Slips</h1>
+            <p class="subtitle">Generate PDF call slips from Club Day CSV</p>
+            <a href="index.html" class="tiny muted" style="margin-top:10px; display:inline-block">← Back to
+                Dashboard</a>
+        </header>
+
+        <div class="card">
+            <h2>Generate Slips</h2>
+            <form id="callslips-form">
+                <label>Upload CSV File</label>
+                <input type="file" id="csv-input" accept=".csv" required>
+
+                <label>Release Time (default 10:10)</label>
+                <input type="text" id="time-input" value="10:10">
+
+                <label>Reason (default Pep Rally)</label>
+                <input type="text" id="reason-input" value="Pep Rally">
+
+                <button type="submit">Generate ZIP</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>Expected CSV Format</h3>
+            <p class="tiny muted" style="margin-bottom:10px">
+                The file must contain the header: <br>
+                <code>1-3 Club Representatives with Period 2 Room Number...</code>
+            </p>
+            <p class="tiny muted">
+                Example Row: <br>
+                <code>John Doe: B101, Jane Smith: Gym</code>
+            </p>
+        </div>
+
+        <footer>
+            <p>ASBOT Call Slips Tool</p>
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById("callslips-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const file = document.getElementById("csv-input").files[0];
+            if (!file) return;
+
+            const time = document.getElementById("time-input").value;
+            const reason = document.getElementById("reason-input").value;
+
+            const btn = e.target.querySelector("button");
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "Generating...";
+
+            const formData = new FormData();
+            formData.append("csvfile", file);
+            formData.append("time", time);
+            formData.append("reason", reason);
+
+            try {
+                // apiCall handles blobs if they are returned
+                // We expect a Blob for the ZIP download
+                const rawRes = await fetch(`${getApiUrl()}/callslips`, {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!rawRes.ok) {
+                    const err = await rawRes.json().catch(() => ({}));
+                    throw new Error(err.error || `Request failed: ${rawRes.status}`);
+                }
+
+                const blob = await rawRes.blob();
+
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "call_slips.zip";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                showMessage("Success! Download started.", "success");
+            } catch (e) {
+                showMessage(`Generation Failed: ${e.message}`, "error");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
+    </script>
+</body>
+
+</html>
