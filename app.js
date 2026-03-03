@@ -1,142 +1,119 @@
 /**
- * ASBOT Frontend Logic
+ * ASBOT Frontend Logic (Google Apps Script API Edition)
  */
 
-const DEFAULT_API_URL = "http://localhost:8000";
+// REPLACE THIS WITH YOUR DEPLOYED WEB APP URL
+const GAS_API_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
 
-// --- API CONFIGURATION ---
+// --- API UTILS ---
 
-function getApiUrl() {
-    return localStorage.getItem("asbot_api_url") || DEFAULT_API_URL;
-}
+/**
+ * Sends data to the Google Apps Script API
+ * @param {string} type - 'PRINT_FILE', 'CALL_SLIP', etc.
+ * @param {object} payloadData - Metadata like printer name, copies, time, reason
+ * @param {HTMLInputElement} fileInput - processing file input element
+ */
+async function apiCall(type, payloadData, fileInput = null) {
+    if (GAS_API_URL.includes("YOUR_APPS_SCRIPT")) {
+        // Fallback or alert if not configured
+        const savedUrl = localStorage.getItem("asbot_api_url");
+        if (savedUrl) {
+            // Use saved URL if available
+        } else {
+            throw new Error("API URL not configured. Please edit app.js or use the settings button.");
+        }
+    }
 
-function setApiUrl(url) {
-    if (!url) return;
-    // Remove trailing slash
-    url = url.replace(/\/$/, "");
-    localStorage.setItem("asbot_api_url", url);
-    location.reload(); 
-}
+    const apiUrl = localStorage.getItem("asbot_api_url") || GAS_API_URL;
 
-function showSettings() {
-    const currentUrl = getApiUrl();
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.style.display = "flex";
-    modal.innerHTML = `
-        <div class="modal-content">
-            <h2>⚙️ Settings</h2>
-            <label>Backend API URL</label>
-            <input type="text" id="api-url-input" value="${currentUrl}" placeholder="http://raspberrypi.local:8000">
-            <div style="display:flex; gap:10px; margin-top:20px">
-                <button onclick="saveSettings()">Save</button>
-                <button onclick="closeSettings()" class="secondary">Cancel</button>
-            </div>
-            <p class="tiny muted" style="margin-top:15px">
-                Use <b>http://localhost:8000</b> for local testing.<br>
-                Use your Pi's IP or Cloudflare URL for remote access.
-            </p>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    window.saveSettings = () => {
-        const val = document.getElementById("api-url-input").value;
-        setApiUrl(val);
+    const payload = {
+        type: type,
+        ...payloadData
     };
-    window.closeSettings = () => {
-        document.body.removeChild(modal);
-    };
+
+    // Handle File if present
+    if (fileInput && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        payload.filename = file.name;
+        payload.mimeType = file.type;
+        try {
+            // Convert to Base64
+            payload.file = await toBase64(file);
+        } catch (e) {
+            throw new Error("Failed to read file: " + e.message);
+        }
+    }
+
+    // Google Apps Script requires text/plain to avoid CORS preflight options request
+    const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (!result.success && result.result !== "success") {
+        throw new Error(result.message || result.error || "Unknown error");
+    }
+
+    return result;
 }
 
-// --- UTILITIES ---
+/**
+ * Helper to convert file to Base64 string
+ */
+function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            // Remove the Data URL prefix (e.g. "data:image/png;base64,")
+            // Google utilities.base64Decode expects raw base64 usually, or handles it.
+            // Safe bet is to strip the prefix.
+            resolve(reader.result.split(',')[1]);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
+// --- UI UTILITIES ---
 
 function showMessage(msg, type = "info") {
-    let box = document.getElementById("message-box");
-    if (!box) {
-        box = document.createElement("div");
-        box.id = "message-box";
-        document.body.appendChild(box);
-    }
-    box.innerText = msg;
-    box.style.display = "block";
-    box.style.borderColor = type === "error" ? "var(--error-color)" : "var(--text-accent)";
-    box.style.color = type === "error" ? "var(--error-color)" : "var(--text-primary)";
-    
-    setTimeout(() => {
-        box.style.display = "none";
-    }, 5000);
-}
-
-async function apiCall(endpoint, method = "GET", body = null) {
-    const baseUrl = getApiUrl();
-    const headers = {};
-    if (body && !(body instanceof FormData)) {
-        headers["Content-Type"] = "application/json";
-        body = JSON.stringify(body);
-    }
-
-    try {
-        const res = await fetch(`${baseUrl}${endpoint}`, {
-            method,
-            headers,
-            body
-        });
-        
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || `Request failed: ${res.status}`);
-        }
-
-        // Return blob for zip/files, generic json otherwise
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-            return await res.json();
-        }
-        return await res.blob();
-
-    } catch (e) {
-        console.error("API Error:", e);
-        throw e;
+    // Look for a specific status container, or create one/alert
+    const statusDiv = document.getElementById("status-message") || document.getElementById("status");
+    if (statusDiv) {
+        statusDiv.innerHTML = msg; // Allow HTML for spinners
+        statusDiv.className = type;
+        statusDiv.style.display = 'block';
+    } else {
+        // Fallback for pages without a status div
+        if (type === 'error') alert(msg);
+        else console.log(msg);
     }
 }
 
-// --- INITIALIZATION ---
+function showSpinner(text = "Processing...") {
+    showMessage(`<div class="spinner"></div> ${text}`, "info");
+}
 
-document.addEventListener("DOMContentLoaded", () => {
-    // Check connection on load if on dashboard
-    if (document.getElementById("status-indicator")) {
-        checkStatus();
+function hideMessage() {
+    const statusDiv = document.getElementById("status-message") || document.getElementById("status");
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+        statusDiv.innerHTML = '';
+        statusDiv.className = '';
     }
-});
+}
 
-async function checkStatus() {
-    const indicator = document.getElementById("status-indicator");
-    if (!indicator) return;
-
-    indicator.innerHTML = '<div class="spinner"></div>Checking connection...';
-    
-    try {
-        const data = await apiCall("/status");
-        if (data.success) {
-            indicator.innerHTML = `
-                <div class="status-grid">
-                    <div class="status-item">
-                        <div class="status-label">API Connection</div>
-                        <div class="status-value ok">Connected</div>
-                    </div>
-                </div>
-            `;
-        } else {
-             throw new Error(data.error);
-        }
-    } catch (e) {
-        indicator.innerHTML = `
-            <div class="status-item" style="border-color:var(--error-color)">
-                <div class="status-label">Connection Failed</div>
-                <div class="status-value err">Offline</div>
-                <p class="tiny muted">${e.message}</p>
-                <button class="secondary" onclick="showSettings()" style="margin-top:10px">Configure URL</button>
-            </div>
-        `;
+// --- SETTINGS (Optional, to let user override URL) ---
+function showSettings() {
+    const currentUrl = localStorage.getItem("asbot_api_url") || GAS_API_URL;
+    const newUrl = prompt("Enter Google Apps Script Web App URL:", currentUrl);
+    if (newUrl) {
+        localStorage.setItem("asbot_api_url", newUrl);
+        location.reload();
     }
 }
