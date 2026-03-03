@@ -108,12 +108,4 @@ function hideMessage() {
     }
 }
 
-// --- SETTINGS (Optional, to let user override URL) ---
-function showSettings() {
-    const currentUrl = localStorage.getItem("asbot_api_url") || GAS_API_URL;
-    const newUrl = prompt("Enter Google Apps Script Web App URL:", currentUrl);
-    if (newUrl) {
-        localStorage.setItem("asbot_api_url", newUrl);
-        location.reload();
-    }
-}
+// --- SETTINGS (Removed) ---

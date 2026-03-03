@@ -1,34 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ASBOT Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
             <div class="robot-icon">🤖</div>
             <h1>ASBOT</h1>
-            <p class="subtitle">Raspberry Pi Server Dashboard</p>
-            <div style="margin-top:20px">
-                <button class="secondary" onclick="showSettings()" style="width:auto; padding:8px 16px; font-size:0.9em">⚙️ Configure API</button>
-            </div>
+            <p class="subtitle">Created by Alex Boldt and Claude</p>
         </header>
 
         <div class="card">
             <h2>System Status</h2>
             <div id="status-indicator">
-                <div class="spinner"></div>
-                <p style="text-align:center">Connecting to API...</p>
             </div>
         </div>
 
         <div class="card">
             <h2>Tools</h2>
-            <div class="tool-grid" style="display:grid; gap:20px; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr))">
-                <a href="https://docs.google.com/forms/d/e/1FAIpQLScyESOk6ePiBPhY9aA61T6hGGNGqX8jRVYlywnTsrp5fntJtA/viewform?usp=publish-editor" target="_blank" class="tool-card" style="display:block; padding:20px; background:rgba(0,139,139,0.1); border-radius:12px; text-decoration:none; border:1px solid #008B8B">
+            <div class="tool-grid"
+                style="display:grid; gap:20px; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr))">
+                <a href="https://docs.google.com/forms/d/e/1FAIpQLScyESOk6ePiBPhY9aA61T6hGGNGqX8jRVYlywnTsrp5fntJtA/viewform?usp=publish-editor"
+                    target="_blank" class="tool-card"
+                    style="display:block; padding:20px; background:rgba(0,139,139,0.1); border-radius:12px; text-decoration:none; border:1px solid #008B8B">
                     <h3 style="color:var(--text-accent)">🖨️ Web Print</h3>
                     <p style="color:var(--text-muted)">Upload PDFs or print text directly to the ASBOT printer.</p>
                 </a>
@@ -43,8 +43,8 @@
     <script src="app.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            checkStatus();
         });
     </script>
 </body>
+
 </html>
